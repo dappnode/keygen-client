@@ -1,0 +1,90 @@
+name: Manual Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (e.g., v0.1.0 or v.0.1.0)'
+        required: true
+        type: string
+      target:
+        description: 'Target branch/commit for tag (default: main)'
+        required: false
+        default: 'main'
+        type: string
+      prerelease:
+        description: 'Mark as prerelease?'
+        required: false
+        default: false
+        type: boolean
+      draft:
+        description: 'Create as draft?'
+        required: false
+        default: false
+        type: boolean
+      notes:
+        description: 'Optional release notes body (otherwise auto-generated)'
+        required: false
+        type: string
+
+permissions:
+  contents: write  # needed to create tags/releases
+
+jobs:
+  create-release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # good practice for tagging
+
+      - name: Normalize and validate version
+        id: vcheck
+        run: |
+          RAW="${{ github.event.inputs.version }}"
+          # Normalize v.0.1.0 -> v0.1.0
+          VERSION=$(printf '%s' "$RAW" | sed -E 's/^v\./v/')
+          echo "Normalized version: $VERSION"
+
+          if ! echo "$VERSION" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+([-\+][0-9A-Za-z\.-]+)?$'; then
+            echo "❌ Invalid version format: $VERSION"
+            echo "Expected like: v0.1.0"
+            exit 1
+          fi
+
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+
+      - name: Ensure tag does not already exist
+        run: |
+          if git ls-remote --tags origin | grep -q "refs/tags/${VERSION}$"; then
+            echo "❌ Tag ${VERSION} already exists on origin."
+            exit 1
+          fi
+
+      - name: Create GitHub Release (creates tag if missing)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TARGET="${{ github.event.inputs.target }}"
+          PRE="${{ github.event.inputs.prerelease }}"
+          DRAFT="${{ github.event.inputs.draft }}"
+          NOTES="${{ github.event.inputs.notes }}"
+
+          # Build flags
+          FLAGS="--target ${TARGET} --generate-notes"
+          [ "$PRE" = "true" ] && FLAGS="$FLAGS --prerelease"
+          [ "$DRAFT" = "true" ] && FLAGS="$FLAGS --draft"
+          if [ -n "$NOTES" ]; then
+            # Use --notes to override generated notes
+            FLAGS=$(printf "%s --notes %q" "$FLAGS" "$NOTES")
+          fi
+
+          echo "Creating release $VERSION on target $TARGET with flags: $FLAGS"
+          gh release create "$VERSION" $FLAGS
+
+      - name: Show release URL
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release view "$VERSION" --json url -q .url
