@@ -135,5 +135,16 @@ type machineResponse struct {
 }
 
 type machinesListResponse struct {
-	Data []machineData `json:"data"`
+	Data  []machineData `json:"data"`
+	Links struct {
+		Self  string  `json:"self"`
+		Prev  *string `json:"prev"`
+		Next  *string `json:"next"`
+		First string  `json:"first"`
+		Last  string  `json:"last"`
+		Meta  struct {
+			Pages int `json:"pages"`
+			Count int `json:"count"`
+		} `json:"meta"`
+	} `json:"links"`
 }

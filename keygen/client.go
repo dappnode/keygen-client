@@ -247,21 +247,33 @@ func (c *Client) ListMachines(ctx context.Context, licenseID string) ([]Machine,
 
 // ListAllMachines lists all machines for the account.
 func (c *Client) ListAllMachines(ctx context.Context) ([]Machine, error) {
-	path := fmt.Sprintf("/accounts/%s/machines", c.accountID)
+	var out []Machine
+	page := 1
 
-	var resp machinesListResponse
-	if err := c.do(ctx, http.MethodGet, path, nil, &resp); err != nil {
-		return nil, err
-	}
+	for {
+		path := fmt.Sprintf("/accounts/%s/machines?page[number]=%d&page[size]=2", c.accountID, page)
 
-	out := make([]Machine, 0, len(resp.Data))
-	for _, d := range resp.Data {
-		out = append(out, Machine{
-			ID:          d.ID,
-			Fingerprint: d.Attributes.Fingerprint,
-			Platform:    d.Attributes.Platform,
-			Name:        d.Attributes.Name,
-		})
+		var resp machinesListResponse
+		if err := c.do(ctx, http.MethodGet, path, nil, &resp); err != nil {
+			return nil, err
+		}
+
+		for _, d := range resp.Data {
+			out = append(out, Machine{
+				ID:          d.ID,
+				LicenseId:   d.Relationships.License.Data.ID,
+				Fingerprint: d.Attributes.Fingerprint,
+				Platform:    d.Attributes.Platform,
+				Name:        d.Attributes.Name,
+			})
+		}
+
+		// Pagination: break if last page
+		//
+		if resp.Links.Meta.Count >= resp.Links.Meta.Pages {
+			break
+		}
+		page++
 	}
 	return out, nil
 }

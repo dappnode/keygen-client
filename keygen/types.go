@@ -17,6 +17,7 @@ type LicenseSummary struct {
 // Machine is a simplified machine representation.
 type Machine struct {
 	ID          string `json:"id"`
+	LicenseId   string `json:"licenseId"`
 	Fingerprint string `json:"fingerprint"`
 	Platform    string `json:"platform"`
 	Name        string `json:"name"`
