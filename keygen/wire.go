@@ -57,10 +57,14 @@ type listLicensesByPolicyResponse struct {
 			Metadata map[string]any `json:"metadata,omitempty"`
 		} `json:"attributes"`
 	} `json:"data"`
+	Links struct {
+		Next *string `json:"next"`
+	} `json:"links"`
+	// (Optional) keep if your account returns this:
 	Meta struct {
 		Page struct {
-			CurrentPage int `json:"current"`
-			TotalPages  int `json:"total"`
+			Current int `json:"current"`
+			Total   int `json:"total"`
 		} `json:"page"`
 	} `json:"meta"`
 }
@@ -135,5 +139,16 @@ type machineResponse struct {
 }
 
 type machinesListResponse struct {
-	Data []machineData `json:"data"`
+	Data  []machineData `json:"data"`
+	Links struct {
+		Self  string  `json:"self"`
+		Prev  *string `json:"prev"`
+		Next  *string `json:"next"`
+		First string  `json:"first"`
+		Last  string  `json:"last"`
+	} `json:"links"`
+	Meta struct {
+		Pages int `json:"pages"`
+		Count int `json:"count"`
+	} `json:"meta"`
 }

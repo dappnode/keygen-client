@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strconv"
 )
 
 // Client is a thin Keygen API wrapper.
@@ -127,25 +128,25 @@ func (c *Client) ListLicensesByPolicy(ctx context.Context, policyID string) ([]L
 	page := 1
 
 	for {
-		path := fmt.Sprintf("/accounts/%s/licenses?filter[policy]=%s&page[number]=%d&page[size]=100",
-			c.accountID, policyID, page)
+		q := url.Values{}
+		q.Set("filter[policy]", policyID)
+		q.Set("page[number]", strconv.Itoa(page))
+		q.Set("page[size]", "100")
+		path := fmt.Sprintf("/accounts/%s/licenses?%s", c.accountID, q.Encode())
 
 		var resp listLicensesByPolicyResponse
 		if err := c.do(ctx, http.MethodGet, path, nil, &resp); err != nil {
 			return nil, err
 		}
-
 		for _, d := range resp.Data {
-			s := LicenseSummary{
+			out = append(out, LicenseSummary{
 				ID:       d.ID,
-				Key:      d.Attributes.Key,    // may be ""
-				Status:   d.Attributes.Status, // may be ""
+				Key:      d.Attributes.Key,
+				Status:   d.Attributes.Status,
 				Metadata: d.Attributes.Metadata,
-			}
-			out = append(out, s)
+			})
 		}
-
-		if resp.Meta.Page.CurrentPage >= resp.Meta.Page.TotalPages {
+		if resp.Links.Next == nil {
 			break
 		}
 		page++
@@ -226,13 +227,17 @@ func (c *Client) DeactivateMachine(ctx context.Context, licenseKey, fingerprint 
 
 // ListMachines lists machines for a license by licenseID.
 func (c *Client) ListMachines(ctx context.Context, licenseID string) ([]Machine, error) {
-	path := fmt.Sprintf("/accounts/%s/machines?license=%s", c.accountID, licenseID)
+	q := url.Values{}
+	page := 1
+	q.Set("filter[license]", licenseID)
+	q.Set("page[number]", strconv.Itoa(page))
+	q.Set("page[size]", "100")
+	path := fmt.Sprintf("/accounts/%s/machines?%s", c.accountID, q.Encode())
 
 	var resp machinesListResponse
 	if err := c.do(ctx, http.MethodGet, path, nil, &resp); err != nil {
 		return nil, err
 	}
-
 	out := make([]Machine, 0, len(resp.Data))
 	for _, d := range resp.Data {
 		out = append(out, Machine{
@@ -241,6 +246,39 @@ func (c *Client) ListMachines(ctx context.Context, licenseID string) ([]Machine,
 			Platform:    d.Attributes.Platform,
 			Name:        d.Attributes.Name,
 		})
+	}
+	return out, nil
+}
+
+// ListAllMachines lists all machines for the account.
+func (c *Client) ListAllMachines(ctx context.Context) ([]Machine, error) {
+	var out []Machine
+	page := 1
+
+	for {
+		q := url.Values{}
+		q.Set("page[number]", strconv.Itoa(page))
+		q.Set("page[size]", "100")
+		path := fmt.Sprintf("/accounts/%s/machines?%s", c.accountID, q.Encode())
+
+		var resp machinesListResponse
+		if err := c.do(ctx, http.MethodGet, path, nil, &resp); err != nil {
+			return nil, err
+		}
+		for _, d := range resp.Data {
+			out = append(out, Machine{
+				ID:          d.ID,
+				LicenseId:   d.Relationships.License.Data.ID,
+				Fingerprint: d.Attributes.Fingerprint,
+				Platform:    d.Attributes.Platform,
+				Name:        d.Attributes.Name,
+			})
+		}
+		// Get out of the loop if no more pages
+		if resp.Links.Next == nil {
+			break
+		}
+		page++
 	}
 	return out, nil
 }
