@@ -245,6 +245,27 @@ func (c *Client) ListMachines(ctx context.Context, licenseID string) ([]Machine,
 	return out, nil
 }
 
+// ListAllMachines lists all machines for the account.
+func (c *Client) ListAllMachines(ctx context.Context) ([]Machine, error) {
+	path := fmt.Sprintf("/accounts/%s/machines", c.accountID)
+
+	var resp machinesListResponse
+	if err := c.do(ctx, http.MethodGet, path, nil, &resp); err != nil {
+		return nil, err
+	}
+
+	out := make([]Machine, 0, len(resp.Data))
+	for _, d := range resp.Data {
+		out = append(out, Machine{
+			ID:          d.ID,
+			Fingerprint: d.Attributes.Fingerprint,
+			Platform:    d.Attributes.Platform,
+			Name:        d.Attributes.Name,
+		})
+	}
+	return out, nil
+}
+
 // --- Validation ---
 
 // Validate checks a key within a fingerprint scope.
