@@ -3,6 +3,8 @@ name: Integration Test
 on:
   pull_request:
     branches: [main]
+  push:
+    branches: [main]
 
 jobs:
   integration-test:
