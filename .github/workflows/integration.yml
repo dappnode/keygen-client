@@ -20,5 +20,5 @@ jobs:
         with:
           go-version: '1.21'
       - name: Run integration test
-        run: go test -v ./keygen/client_integration_test.go
+        run: go test -v -run TestIntegration_FullFlow ./keygen
 
