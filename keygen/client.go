@@ -129,7 +129,7 @@ func (c *Client) ListLicensesByPolicy(ctx context.Context, policyID string) ([]L
 
 	for {
 		q := url.Values{}
-		q.Set("filter[policy]", policyID)
+		q.Set("policy", policyID) // <-- FIXED: use correct query param
 		q.Set("page[number]", strconv.Itoa(page))
 		q.Set("page[size]", "100")
 		path := fmt.Sprintf("/accounts/%s/licenses?%s", c.accountID, q.Encode())
@@ -226,10 +226,11 @@ func (c *Client) DeactivateMachine(ctx context.Context, licenseKey, fingerprint 
 }
 
 // ListMachines lists machines for a license by licenseID.
+// If no machines exist, returns an empty slice.
 func (c *Client) ListMachines(ctx context.Context, licenseID string) ([]Machine, error) {
 	q := url.Values{}
 	page := 1
-	q.Set("filter[license]", licenseID)
+	q.Set("license", licenseID) // <-- FIXED: use correct query param
 	q.Set("page[number]", strconv.Itoa(page))
 	q.Set("page[size]", "100")
 	path := fmt.Sprintf("/accounts/%s/machines?%s", c.accountID, q.Encode())
@@ -327,7 +328,7 @@ func (c *Client) ResolveLicenseID(ctx context.Context, licenseKey string) (strin
 		return "", err
 	}
 	if resp.Data.ID == "" {
-		return "", fmt.Errorf("keygen: empty license id for provided key")
+		return "", fmt.Errorf("keygen: no license id found of licenseKey %s", licenseKey)
 	}
 	return resp.Data.ID, nil
 }

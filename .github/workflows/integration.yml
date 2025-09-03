@@ -1,0 +1,24 @@
+name: Integration Test
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  integration-test:
+    runs-on: ubuntu-latest
+    env:
+      KEYGEN_ACCOUNT_ID: ${{ secrets.KEYGEN_ACCOUNT_ID }}
+      KEYGEN_API_TOKEN: ${{ secrets.KEYGEN_API_TOKEN }}
+      KEYGEN_POLICY_ID: ${{ secrets.KEYGEN_POLICY_ID }}
+      KEYGEN_POLICY_ID2: ${{ secrets.KEYGEN_POLICY_ID2 }}
+      KEYGEN_CUSTOMER_EMAIL: ${{ secrets.KEYGEN_CUSTOMER_EMAIL }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+      - name: Run integration test
+        run: go test -v -run TestIntegration_FullFlow ./keygen
+
