@@ -65,7 +65,7 @@ func New(accountID, apiToken string, opts ...Option) *Client {
 // --- Licenses ---
 
 // CreateLicense creates a new license under a policy, returning its key.
-func (c *Client) CreateLicense(ctx context.Context, policyID string, meta LicenseMetadata) (string, error) {
+func (c *Client) CreateLicense(ctx context.Context, policyID string, meta LicenseMetadata) (string, int, error) {
 	path := fmt.Sprintf("/accounts/%s/licenses", c.accountID)
 	req := licenseCreateRequest{
 		Data: licenseCreateData{
@@ -82,61 +82,67 @@ func (c *Client) CreateLicense(ctx context.Context, policyID string, meta Licens
 	}
 
 	var resp licenseCreateResponse
-	if err := c.do(ctx, http.MethodPost, path, req, &resp); err != nil {
-		return "", err
+	httpCode, err := c.do(ctx, http.MethodPost, path, req, &resp)
+	if err != nil {
+		return "", httpCode, err
 	}
 	key := resp.Data.Attributes.Key
 	if key == "" {
-		return "", fmt.Errorf("keygen: license creation returned empty key")
+		return "", httpCode, fmt.Errorf("keygen: license creation returned empty key")
 	}
-	return key, nil
+	return key, httpCode, nil
 }
 
 // DeleteLicense deletes a license by ID (204 on success).
-func (c *Client) DeleteLicense(ctx context.Context, licenseID string) error {
+func (c *Client) DeleteLicense(ctx context.Context, licenseID string) (int, error) {
 	path := fmt.Sprintf("/accounts/%s/licenses/%s", c.accountID, licenseID)
-	return c.do(ctx, http.MethodDelete, path, nil, nil)
+	httpCode, err := c.do(ctx, http.MethodDelete, path, nil, nil)
+	return httpCode, err
 }
 
 // GetLicenseBySubscriptionID returns the license ID for a metadata[subscriptionId].
-func (c *Client) GetLicenseBySubscriptionID(ctx context.Context, subscriptionID string) (string, error) {
+func (c *Client) GetLicenseBySubscriptionID(ctx context.Context, subscriptionID string) (string, int, error) {
 	q := url.Values{}
 	q.Set("metadata[subscriptionId]", subscriptionID)
 	path := fmt.Sprintf("/accounts/%s/licenses?%s", c.accountID, q.Encode())
 
 	var resp getLicenseBySubscriptionResponse
-	if err := c.do(ctx, http.MethodGet, path, nil, &resp); err != nil {
-		return "", err
+	httpCode, err := c.do(ctx, http.MethodGet, path, nil, &resp)
+	if err != nil {
+		return "", httpCode, err
 	}
 
 	if len(resp.Data) == 0 {
-		return "", nil // keep current behavior: not an error if missing
+		return "", httpCode, nil // keep current behavior: not an error if missing
 	}
 	if len(resp.Data) > 1 {
-		return "", fmt.Errorf("keygen: multiple licenses for subscriptionId %s", subscriptionID)
+		return "", httpCode, fmt.Errorf("keygen: multiple licenses for subscriptionId %s", subscriptionID)
 	}
 	if resp.Data[0].ID == "" {
-		return "", fmt.Errorf("keygen: empty license id for subscriptionId %s", subscriptionID)
+		return "", httpCode, fmt.Errorf("keygen: empty license id for subscriptionId %s", subscriptionID)
 	}
-	return resp.Data[0].ID, nil
+	return resp.Data[0].ID, httpCode, nil
 }
 
 // ListLicensesByPolicy returns a rich view (ID, Key*, Status*, Metadata).
 // Key/Status may be empty when the API/resource view omits them.
-func (c *Client) ListLicensesByPolicy(ctx context.Context, policyID string) ([]LicenseSummary, error) {
+func (c *Client) ListLicensesByPolicy(ctx context.Context, policyID string) ([]LicenseSummary, int, error) {
 	var out []LicenseSummary
 	page := 1
+	var lastHttpCode int
 
 	for {
 		q := url.Values{}
-		q.Set("policy", policyID) // <-- FIXED: use correct query param
+		q.Set("policy", policyID)
 		q.Set("page[number]", strconv.Itoa(page))
 		q.Set("page[size]", "100")
 		path := fmt.Sprintf("/accounts/%s/licenses?%s", c.accountID, q.Encode())
 
 		var resp listLicensesByPolicyResponse
-		if err := c.do(ctx, http.MethodGet, path, nil, &resp); err != nil {
-			return nil, err
+		httpCode, err := c.do(ctx, http.MethodGet, path, nil, &resp)
+		lastHttpCode = httpCode
+		if err != nil {
+			return nil, httpCode, err
 		}
 		for _, d := range resp.Data {
 			out = append(out, LicenseSummary{
@@ -151,14 +157,14 @@ func (c *Client) ListLicensesByPolicy(ctx context.Context, policyID string) ([]L
 		}
 		page++
 	}
-	return out, nil
+	return out, lastHttpCode, nil
 }
 
 // ListLicenseKeysByPolicy is a convenience wrapper returning only keys.
-func (c *Client) ListLicenseKeysByPolicy(ctx context.Context, policyID string) ([]string, error) {
-	items, err := c.ListLicensesByPolicy(ctx, policyID)
+func (c *Client) ListLicenseKeysByPolicy(ctx context.Context, policyID string) ([]string, int, error) {
+	items, httpCode, err := c.ListLicensesByPolicy(ctx, policyID)
 	if err != nil {
-		return nil, err
+		return nil, httpCode, err
 	}
 	keys := make([]string, 0, len(items))
 	for _, it := range items {
@@ -166,17 +172,17 @@ func (c *Client) ListLicenseKeysByPolicy(ctx context.Context, policyID string) (
 			keys = append(keys, it.Key)
 		}
 	}
-	return keys, nil
+	return keys, httpCode, nil
 }
 
 // --- Machines ---
 
 // ActivateMachine creates a machine bound to the license (by key).
 // name/platform default to the client defaults if empty.
-func (c *Client) ActivateMachine(ctx context.Context, licenseKey, fingerprint, name, platform string) error {
-	licenseID, err := c.ResolveLicenseID(ctx, licenseKey)
+func (c *Client) ActivateMachine(ctx context.Context, licenseKey, fingerprint, name, platform string) (int, error) {
+	licenseID, httpCode, err := c.ResolveLicenseID(ctx, licenseKey)
 	if err != nil {
-		return err
+		return httpCode, err
 	}
 	if name == "" {
 		name = c.defaultMachineName
@@ -200,44 +206,47 @@ func (c *Client) ActivateMachine(ctx context.Context, licenseKey, fingerprint, n
 			},
 		},
 	}
-	return c.do(ctx, http.MethodPost, fmt.Sprintf("/accounts/%s/machines", c.accountID), req, &machineResponse{})
+	httpCode, err = c.do(ctx, http.MethodPost, fmt.Sprintf("/accounts/%s/machines", c.accountID), req, &machineResponse{})
+	return httpCode, err
 }
 
 // DeactivateMachine deletes a machine (by matching fingerprint) from the license.
 // Returns (found, error). When found==false and err==nil, no machine matched.
-func (c *Client) DeactivateMachine(ctx context.Context, licenseKey, fingerprint string) (bool, error) {
-	licenseID, err := c.ResolveLicenseID(ctx, licenseKey)
+func (c *Client) DeactivateMachine(ctx context.Context, licenseKey, fingerprint string) (bool, int, error) {
+	licenseID, httpCode, err := c.ResolveLicenseID(ctx, licenseKey)
 	if err != nil {
-		return false, err
+		return false, httpCode, err
 	}
 
-	list, err := c.ListMachines(ctx, licenseID)
+	list, httpCode, err := c.ListMachines(ctx, licenseID)
 	if err != nil {
-		return false, err
+		return false, httpCode, err
 	}
 
 	for _, m := range list {
 		if m.Fingerprint == fingerprint {
-			return true, c.do(ctx, http.MethodDelete,
+			httpCode, err := c.do(ctx, http.MethodDelete,
 				fmt.Sprintf("/accounts/%s/machines/%s", c.accountID, m.ID), nil, nil)
+			return true, httpCode, err
 		}
 	}
-	return false, nil
+	return false, httpCode, nil
 }
 
 // ListMachines lists machines for a license by licenseID.
 // If no machines exist, returns an empty slice.
-func (c *Client) ListMachines(ctx context.Context, licenseID string) ([]Machine, error) {
+func (c *Client) ListMachines(ctx context.Context, licenseID string) ([]Machine, int, error) {
 	q := url.Values{}
 	page := 1
-	q.Set("license", licenseID) // <-- FIXED: use correct query param
+	q.Set("license", licenseID)
 	q.Set("page[number]", strconv.Itoa(page))
 	q.Set("page[size]", "100")
 	path := fmt.Sprintf("/accounts/%s/machines?%s", c.accountID, q.Encode())
 
 	var resp machinesListResponse
-	if err := c.do(ctx, http.MethodGet, path, nil, &resp); err != nil {
-		return nil, err
+	httpCode, err := c.do(ctx, http.MethodGet, path, nil, &resp)
+	if err != nil {
+		return nil, httpCode, err
 	}
 	out := make([]Machine, 0, len(resp.Data))
 	for _, d := range resp.Data {
@@ -248,13 +257,14 @@ func (c *Client) ListMachines(ctx context.Context, licenseID string) ([]Machine,
 			Name:        d.Attributes.Name,
 		})
 	}
-	return out, nil
+	return out, httpCode, nil
 }
 
 // ListAllMachines lists all machines for the account.
-func (c *Client) ListAllMachines(ctx context.Context) ([]Machine, error) {
+func (c *Client) ListAllMachines(ctx context.Context) ([]Machine, int, error) {
 	var out []Machine
 	page := 1
+	var lastHttpCode int
 
 	for {
 		q := url.Values{}
@@ -263,8 +273,10 @@ func (c *Client) ListAllMachines(ctx context.Context) ([]Machine, error) {
 		path := fmt.Sprintf("/accounts/%s/machines?%s", c.accountID, q.Encode())
 
 		var resp machinesListResponse
-		if err := c.do(ctx, http.MethodGet, path, nil, &resp); err != nil {
-			return nil, err
+		httpCode, err := c.do(ctx, http.MethodGet, path, nil, &resp)
+		lastHttpCode = httpCode
+		if err != nil {
+			return nil, httpCode, err
 		}
 		for _, d := range resp.Data {
 			out = append(out, Machine{
@@ -281,13 +293,13 @@ func (c *Client) ListAllMachines(ctx context.Context) ([]Machine, error) {
 		}
 		page++
 	}
-	return out, nil
+	return out, lastHttpCode, nil
 }
 
 // --- Validation ---
 
 // Validate checks a key within a fingerprint scope.
-func (c *Client) Validate(ctx context.Context, licenseKey, fingerprint string) (LicenseValidation, error) {
+func (c *Client) Validate(ctx context.Context, licenseKey, fingerprint string) (LicenseValidation, int, error) {
 	req := validateLicenseRequest{
 		Meta: validateMeta{
 			Key: licenseKey,
@@ -298,10 +310,11 @@ func (c *Client) Validate(ctx context.Context, licenseKey, fingerprint string) (
 	}
 
 	var resp licenseValidationResponse
-	if err := c.do(ctx, http.MethodPost,
+	httpCode, err := c.do(ctx, http.MethodPost,
 		fmt.Sprintf("/accounts/%s/licenses/actions/validate-key", c.accountID),
-		req, &resp); err != nil {
-		return LicenseValidation{}, err
+		req, &resp)
+	if err != nil {
+		return LicenseValidation{}, httpCode, err
 	}
 
 	return LicenseValidation{
@@ -313,41 +326,42 @@ func (c *Client) Validate(ctx context.Context, licenseKey, fingerprint string) (
 		Detail:      resp.Meta.Detail,
 		Timestamp:   resp.Meta.Timestamp,
 		Fingerprint: resp.Meta.Scope.Fingerprint,
-	}, nil
+	}, httpCode, nil
 }
 
 // ResolveLicenseID gets the license ID from a key using validate-key.
-func (c *Client) ResolveLicenseID(ctx context.Context, licenseKey string) (string, error) {
+func (c *Client) ResolveLicenseID(ctx context.Context, licenseKey string) (string, int, error) {
 	req := resolveLicenseIDRequest{}
 	req.Meta.Key = licenseKey
 
 	var resp licenseValidationResponse
-	if err := c.do(ctx, http.MethodPost,
+	httpCode, err := c.do(ctx, http.MethodPost,
 		fmt.Sprintf("/accounts/%s/licenses/actions/validate-key", c.accountID),
-		req, &resp); err != nil {
-		return "", err
+		req, &resp)
+	if err != nil {
+		return "", httpCode, err
 	}
 	if resp.Data.ID == "" {
-		return "", fmt.Errorf("keygen: no license id found of licenseKey %s", licenseKey)
+		return "", httpCode, fmt.Errorf("keygen: no license id found of licenseKey %s", licenseKey)
 	}
-	return resp.Data.ID, nil
+	return resp.Data.ID, httpCode, nil
 }
 
 // --- HTTP plumbing ---
 
-func (c *Client) do(ctx context.Context, method, path string, in any, out any) error {
+func (c *Client) do(ctx context.Context, method, path string, in any, out any) (int, error) {
 	var body io.Reader
 	if in != nil {
 		var buf bytes.Buffer
 		if err := json.NewEncoder(&buf).Encode(in); err != nil {
-			return fmt.Errorf("keygen: encode request: %w", err)
+			return 0, fmt.Errorf("keygen: encode request: %w", err)
 		}
 		body = &buf
 	}
 
 	req, err := http.NewRequestWithContext(ctx, method, c.baseURL+path, body)
 	if err != nil {
-		return fmt.Errorf("keygen: new request: %w", err)
+		return 0, fmt.Errorf("keygen: new request: %w", err)
 	}
 	if in != nil {
 		req.Header.Set("Content-Type", "application/vnd.api+json")
@@ -357,26 +371,28 @@ func (c *Client) do(ctx context.Context, method, path string, in any, out any) e
 
 	resp, err := c.http.Do(req)
 	if err != nil {
-		return fmt.Errorf("keygen: do request: %w", err)
+		return 0, fmt.Errorf("keygen: do request: %w", err)
 	}
 	defer resp.Body.Close()
 
+	httpCode := resp.StatusCode
+
 	// Non-2xx => return body as plain error string (no custom types)
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+	if httpCode < 200 || httpCode >= 300 {
 		b, _ := io.ReadAll(resp.Body)
 		if len(b) == 0 {
-			return fmt.Errorf("keygen: %s %s -> HTTP %d", method, path, resp.StatusCode)
+			return httpCode, fmt.Errorf("keygen: %s %s -> HTTP %d", method, path, httpCode)
 		}
-		return fmt.Errorf("keygen: %s %s -> HTTP %d: %s", method, path, resp.StatusCode, string(b))
+		return httpCode, fmt.Errorf("keygen: %s %s -> HTTP %d: %s", method, path, httpCode, string(b))
 	}
 
 	if out == nil {
 		// Drain for keep-alives anyway
 		io.Copy(io.Discard, resp.Body)
-		return nil
+		return httpCode, nil
 	}
 	if err := json.NewDecoder(resp.Body).Decode(out); err != nil {
-		return fmt.Errorf("keygen: decode response: %w", err)
+		return httpCode, fmt.Errorf("keygen: decode response: %w", err)
 	}
-	return nil
+	return httpCode, nil
 }

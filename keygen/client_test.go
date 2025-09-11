@@ -22,55 +22,55 @@ func TestCreateLicense(t *testing.T) {
 		SubscriptionID: subscriptionID,
 		CustomerEmail:  customerEmail,
 	}
-	result, err := client.CreateLicense(ctx, policyID, meta)
+	result, httpCode, err := client.CreateLicense(ctx, policyID, meta)
 	if err != nil {
-		t.Fatalf("CreateLicense error: %v", err)
+		t.Fatalf("CreateLicense error: %v (HTTP %d)", err, httpCode)
 	}
-	t.Logf("CreateLicense result: %v", result)
+	t.Logf("CreateLicense result: %v, HTTP code: %d", result, httpCode)
 }
 
 func TestDeleteLicense(t *testing.T) {
 	ctx := context.Background()
 	client := getTestClient()
 	licenseID := os.Getenv("KEYGEN_LICENSE_ID")
-	err := client.DeleteLicense(ctx, licenseID)
+	httpCode, err := client.DeleteLicense(ctx, licenseID)
 	if err != nil {
-		t.Fatalf("DeleteLicense error: %v", err)
+		t.Fatalf("DeleteLicense error: %v (HTTP %d)", err, httpCode)
 	}
-	t.Log("DeleteLicense succeeded")
+	t.Logf("DeleteLicense succeeded, HTTP code: %d", httpCode)
 }
 
 func TestGetLicenseBySubscriptionID(t *testing.T) {
 	ctx := context.Background()
 	client := getTestClient()
 	subscriptionID := os.Getenv("KEYGEN_SUBSCRIPTION_ID")
-	result, err := client.GetLicenseBySubscriptionID(ctx, subscriptionID)
+	result, httpCode, err := client.GetLicenseBySubscriptionID(ctx, subscriptionID)
 	if err != nil {
-		t.Fatalf("GetLicenseBySubscriptionID error: %v", err)
+		t.Fatalf("GetLicenseBySubscriptionID error: %v (HTTP %d)", err, httpCode)
 	}
-	t.Logf("GetLicenseBySubscriptionID result: %v", result)
+	t.Logf("GetLicenseBySubscriptionID result: %v, HTTP code: %d", result, httpCode)
 }
 
 func TestListLicensesByPolicy(t *testing.T) {
 	ctx := context.Background()
 	client := getTestClient()
 	policyID := os.Getenv("KEYGEN_POLICY_ID")
-	result, err := client.ListLicensesByPolicy(ctx, policyID)
+	result, httpCode, err := client.ListLicensesByPolicy(ctx, policyID)
 	if err != nil {
-		t.Fatalf("ListLicensesByPolicy error: %v", err)
+		t.Fatalf("ListLicensesByPolicy error: %v (HTTP %d)", err, httpCode)
 	}
-	t.Logf("ListLicensesByPolicy result: %+v", result)
+	t.Logf("ListLicensesByPolicy result: %+v, HTTP code: %d", result, httpCode)
 }
 
 func TestListLicenseKeysByPolicy(t *testing.T) {
 	ctx := context.Background()
 	client := getTestClient()
 	policyID := os.Getenv("KEYGEN_POLICY_ID")
-	result, err := client.ListLicenseKeysByPolicy(ctx, policyID)
+	result, httpCode, err := client.ListLicenseKeysByPolicy(ctx, policyID)
 	if err != nil {
-		t.Fatalf("ListLicenseKeysByPolicy error: %v", err)
+		t.Fatalf("ListLicenseKeysByPolicy error: %v (HTTP %d)", err, httpCode)
 	}
-	t.Logf("ListLicenseKeysByPolicy result: %+v", result)
+	t.Logf("ListLicenseKeysByPolicy result: %+v, HTTP code: %d", result, httpCode)
 }
 
 func TestActivateMachine(t *testing.T) {
@@ -78,11 +78,11 @@ func TestActivateMachine(t *testing.T) {
 	client := getTestClient()
 	licenseKey := os.Getenv("KEYGEN_LICENSE_KEY")
 	fingerprint := os.Getenv("KEYGEN_FINGERPRINT")
-	err := client.ActivateMachine(ctx, licenseKey, fingerprint, "", "")
+	httpCode, err := client.ActivateMachine(ctx, licenseKey, fingerprint, "", "")
 	if err != nil {
-		t.Fatalf("ActivateMachine error: %v", err)
+		t.Fatalf("ActivateMachine error: %v (HTTP %d)", err, httpCode)
 	}
-	t.Log("ActivateMachine succeeded")
+	t.Logf("ActivateMachine succeeded, HTTP code: %d", httpCode)
 }
 
 func TestDeactivateMachine(t *testing.T) {
@@ -90,32 +90,32 @@ func TestDeactivateMachine(t *testing.T) {
 	client := getTestClient()
 	licenseKey := os.Getenv("KEYGEN_LICENSE_KEY")
 	fingerprint := os.Getenv("KEYGEN_FINGERPRINT")
-	found, err := client.DeactivateMachine(ctx, licenseKey, fingerprint)
+	found, httpCode, err := client.DeactivateMachine(ctx, licenseKey, fingerprint)
 	if err != nil {
-		t.Fatalf("DeactivateMachine error: %v", err)
+		t.Fatalf("DeactivateMachine error: %v (HTTP %d)", err, httpCode)
 	}
-	t.Logf("DeactivateMachine found: %v", found)
+	t.Logf("DeactivateMachine found: %v, HTTP code: %d", found, httpCode)
 }
 
 func TestListMachines(t *testing.T) {
 	ctx := context.Background()
 	client := getTestClient()
 	licenseID := os.Getenv("KEYGEN_LICENSE_ID")
-	result, err := client.ListMachines(ctx, licenseID)
+	result, httpCode, err := client.ListMachines(ctx, licenseID)
 	if err != nil {
-		t.Fatalf("ListMachines error: %v", err)
+		t.Fatalf("ListMachines error: %v (HTTP %d)", err, httpCode)
 	}
-	t.Logf("ListMachines result: %+v", result)
+	t.Logf("ListMachines result: %+v, HTTP code: %d", result, httpCode)
 }
 
 func TestListAllMachines(t *testing.T) {
 	ctx := context.Background()
 	client := getTestClient()
-	result, err := client.ListAllMachines(ctx)
+	result, httpCode, err := client.ListAllMachines(ctx)
 	if err != nil {
-		t.Fatalf("ListAllMachines error: %v", err)
+		t.Fatalf("ListAllMachines error: %v (HTTP %d)", err, httpCode)
 	}
-	t.Logf("ListAllMachines result: %+v", result)
+	t.Logf("ListAllMachines result: %+v, HTTP code: %d", result, httpCode)
 }
 
 func TestValidate(t *testing.T) {
@@ -123,20 +123,20 @@ func TestValidate(t *testing.T) {
 	client := getTestClient()
 	licenseKey := os.Getenv("KEYGEN_LICENSE_KEY")
 	fingerprint := os.Getenv("KEYGEN_FINGERPRINT")
-	result, err := client.Validate(ctx, licenseKey, fingerprint)
+	result, httpCode, err := client.Validate(ctx, licenseKey, fingerprint)
 	if err != nil {
-		t.Fatalf("Validate error: %v", err)
+		t.Fatalf("Validate error: %v (HTTP %d)", err, httpCode)
 	}
-	t.Logf("Validate result: %+v", result)
+	t.Logf("Validate result: %+v, HTTP code: %d", result, httpCode)
 }
 
 func TestResolveLicenseID(t *testing.T) {
 	ctx := context.Background()
 	client := getTestClient()
 	licenseKey := os.Getenv("KEYGEN_LICENSE_KEY")
-	result, err := client.ResolveLicenseID(ctx, licenseKey)
+	result, httpCode, err := client.ResolveLicenseID(ctx, licenseKey)
 	if err != nil {
-		t.Fatalf("ResolveLicenseID error: %v", err)
+		t.Fatalf("ResolveLicenseID error: %v (HTTP %d)", err, httpCode)
 	}
-	t.Logf("ResolveLicenseID result: %v", result)
+	t.Logf("ResolveLicenseID result: %v, HTTP code: %d", result, httpCode)
 }
