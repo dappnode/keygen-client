@@ -1,5 +1,27 @@
 package keygen
 
+// HTTPError represents an error response from the Keygen API that includes the HTTP status code.
+type HTTPError struct {
+	Method     string // HTTP method (GET, POST, etc.)
+	Path       string // API path
+	StatusCode int    // HTTP status code
+	Body       string // Response body
+	Err        error  // Underlying error if any
+}
+
+// Error implements the error interface.
+func (e *HTTPError) Error() string {
+	if e.Body != "" {
+		return e.Body
+	}
+	return e.Err.Error()
+}
+
+// Unwrap allows error unwrapping.
+func (e *HTTPError) Unwrap() error {
+	return e.Err
+}
+
 // LicenseMetadata mirrors the structured metadata you already use.
 type LicenseMetadata struct {
 	SubscriptionID string `json:"subscriptionId"`

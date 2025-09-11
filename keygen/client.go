@@ -361,13 +361,27 @@ func (c *Client) do(ctx context.Context, method, path string, in any, out any) e
 	}
 	defer resp.Body.Close()
 
-	// Non-2xx => return body as plain error string (no custom types)
+	// Non-2xx => return HTTPError with status code
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		b, _ := io.ReadAll(resp.Body)
+		var bodyStr string
+		var baseErr error
+		
 		if len(b) == 0 {
-			return fmt.Errorf("keygen: %s %s -> HTTP %d", method, path, resp.StatusCode)
+			bodyStr = fmt.Sprintf("keygen: %s %s -> HTTP %d", method, path, resp.StatusCode)
+			baseErr = fmt.Errorf("HTTP %d", resp.StatusCode)
+		} else {
+			bodyStr = fmt.Sprintf("keygen: %s %s -> HTTP %d: %s", method, path, resp.StatusCode, string(b))
+			baseErr = fmt.Errorf("HTTP %d: %s", resp.StatusCode, string(b))
 		}
-		return fmt.Errorf("keygen: %s %s -> HTTP %d: %s", method, path, resp.StatusCode, string(b))
+		
+		return &HTTPError{
+			Method:     method,
+			Path:       path,
+			StatusCode: resp.StatusCode,
+			Body:       bodyStr,
+			Err:        baseErr,
+		}
 	}
 
 	if out == nil {
