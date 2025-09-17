@@ -354,14 +354,14 @@ func (c *Client) do(ctx context.Context, method, path string, in any, out any) (
 	if in != nil {
 		var buf bytes.Buffer
 		if err := json.NewEncoder(&buf).Encode(in); err != nil {
-			return 0, fmt.Errorf("keygen: encode request: %w", err)
+			return 500, fmt.Errorf("keygen: encode request: %w", err)
 		}
 		body = &buf
 	}
 
 	req, err := http.NewRequestWithContext(ctx, method, c.baseURL+path, body)
 	if err != nil {
-		return 0, fmt.Errorf("keygen: new request: %w", err)
+		return 500, fmt.Errorf("keygen: new request: %w", err)
 	}
 	if in != nil {
 		req.Header.Set("Content-Type", "application/vnd.api+json")
@@ -371,7 +371,7 @@ func (c *Client) do(ctx context.Context, method, path string, in any, out any) (
 
 	resp, err := c.http.Do(req)
 	if err != nil {
-		return 0, fmt.Errorf("keygen: do request: %w", err)
+		return 500, fmt.Errorf("keygen: do request: %w", err)
 	}
 	defer resp.Body.Close()
 
